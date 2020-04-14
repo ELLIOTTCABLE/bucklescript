@@ -84,6 +84,27 @@ let suites =
         ]
     end; *)
     __LOC__ >:: begin fun _ ->
+       let js = Ext_file_extension.make "js" in
+       let bs = Ext_file_extension.make "bs" in
+       let bs_js = Ext_file_extension.make ~tagged:true "js" in
+       Ext_file_extension.to_string js =~ ".js";
+       Ext_file_extension.to_string bs_js =~ ".bs.js";
+       Ext_file_extension.of_string_opt ".js" =~ Some js;
+       Ext_file_extension.of_string_opt ".bs" =~ Some bs;
+       Ext_file_extension.of_string_opt ".bs.js" =~ Some bs_js;
+       Ext_file_extension.of_string_opt "." =~ None;
+       Ext_file_extension.of_string_opt "" =~ None;
+
+       Ext_file_extension.of_string_opt ".something arbitrary"
+       =~ Some (Ext_file_extension.make "something arbitrary");
+       Ext_file_extension.of_string_opt ".bs.something arbitrary"
+       =~ Some (Ext_file_extension.make ~tagged:true "something arbitrary");
+
+       let (//.) = Ext_file_extension.append_to in
+       "./foo" //. js =~ "./foo.js";
+       "./dir/something" //. bs_js =~ "./dir/something.bs.js"
+    end;
+    __LOC__ >:: begin fun _ ->
       Ext_filename.module_name "a/hello.ml" =~ "Hello";
       Ext_filename.as_module ~basename:"a.ml" =~ Some {module_name = "A"; case = false};
       Ext_filename.as_module ~basename:"Aa.ml" =~ Some {module_name = "Aa"; case = true};
