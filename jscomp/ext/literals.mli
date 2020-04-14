@@ -77,42 +77,41 @@ val build_ninja : string
 (* Name of the library file created for each external dependency. *)
 val library_file : string
 
-val suffix_a : string
-val suffix_cmj : string
-val suffix_cmo : string
-val suffix_cma : string
-val suffix_cmi : string
-val suffix_cmx : string
-val suffix_cmxa : string
-val suffix_ml : string
-val suffix_mlast : string
-val suffix_mlast_simple : string
-val suffix_mliast : string
-val suffix_reast : string
-val suffix_reiast : string
+val file_extension_a : Ext_file_extension.t
+val file_extension_cmj : Ext_file_extension.t
+val file_extension_cmo : Ext_file_extension.t
+val file_extension_cma : Ext_file_extension.t
+val file_extension_cmi : Ext_file_extension.t
+val file_extension_cmx : Ext_file_extension.t
+val file_extension_cmxa : Ext_file_extension.t
+val file_extension_ml : Ext_file_extension.t
+val file_extension_mlast : Ext_file_extension.t
+val file_extension_mlast_simple : Ext_file_extension.t
+val file_extension_mliast : Ext_file_extension.t
+val file_extension_reast : Ext_file_extension.t
+val file_extension_reiast : Ext_file_extension.t
 
-val suffix_mliast_simple : string
-val suffix_mlmap : string
-val suffix_mll : string
-val suffix_re : string
-val suffix_rei : string
+val file_extension_mliast_simple : Ext_file_extension.t
+val file_extension_mlmap : Ext_file_extension.t
+val file_extension_mll : Ext_file_extension.t
+val file_extension_re : Ext_file_extension.t
+val file_extension_rei : Ext_file_extension.t
 
-val suffix_d : string
-val suffix_js : string
-val suffix_mjs : string
-val suffix_cjs : string
-val suffix_bs_js : string
-val suffix_bs_mjs : string
-val suffix_bs_cjs : string
-(* val suffix_re_js : string *)
-val suffix_gen_js : string
-val suffix_gen_tsx: string
+val file_extension_d : Ext_file_extension.t
+val file_extension_js : Ext_file_extension.t
+val file_extension_mjs : Ext_file_extension.t
+val file_extension_cjs : Ext_file_extension.t
+val file_extension_bs_js : Ext_file_extension.t
+val file_extension_bs_mjs : Ext_file_extension.t
+val file_extension_bs_cjs : Ext_file_extension.t
+val file_extension_gen_js : Ext_file_extension.t
+val file_extension_gen_tsx: Ext_file_extension.t
 
-val suffix_tsx : string
+val file_extension_tsx : Ext_file_extension.t
 
-val suffix_mli : string
-val suffix_cmt : string
-val suffix_cmti : string
+val file_extension_mli : Ext_file_extension.t
+val file_extension_cmt : Ext_file_extension.t
+val file_extension_cmti : Ext_file_extension.t
 
 val commonjs : string
 

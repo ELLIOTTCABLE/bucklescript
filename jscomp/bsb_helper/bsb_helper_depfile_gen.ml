@@ -96,7 +96,7 @@ let output_file (buf : Ext_buffer.t) source namespace =
 let oc_cmi buf namespace source =
   Ext_buffer.add_char buf ' ';
   output_file buf source namespace;
-  Ext_buffer.add_string buf Literals.suffix_cmi
+  Ext_buffer.add_string buf (Ext_file_extension.to_string Literals.file_extension_cmi)
 
 
 (** For cases with self cycle e.g, in b.ml
@@ -125,8 +125,8 @@ let find_module db dependent_module is_not_lib_dir (index : Bsb_dir_index.t) =
 
 
 let oc_impl (mlast : string) (index : Bsb_dir_index.t) (db : Bsb_db_decode.t)
-    (namespace : string option) (buf : Ext_buffer.t) (lhs_suffix : string)
-    (rhs_suffix : string) =
+    (namespace : string option) (buf : Ext_buffer.t) (lhs_ext : Ext_file_extension.t)
+    (rhs_ext : Ext_file_extension.t) =
   (* TODO: move namespace upper, it is better to resolve ealier *)
   let has_deps = ref false in
   let cur_module_name = Ext_filename.module_name mlast in
@@ -134,13 +134,13 @@ let oc_impl (mlast : string) (index : Bsb_dir_index.t) (db : Bsb_db_decode.t)
     lazy
       ( has_deps := true;
         output_file buf (Ext_filename.chop_extension_maybe mlast) namespace;
-        Ext_buffer.add_string buf lhs_suffix;
+        Ext_buffer.add_string buf (Ext_file_extension.to_string lhs_ext);
         Ext_buffer.add_string buf dep_lit )
   in
   Ext_option.iter namespace (fun ns ->
       Lazy.force at_most_once;
       Ext_buffer.add_string buf ns;
-      Ext_buffer.add_string buf Literals.suffix_cmi);
+      Ext_buffer.add_string buf (Ext_file_extension.to_string Literals.file_extension_cmi));
   (* TODO: moved into static files*)
   let is_not_lib_dir = not (Bsb_dir_index.is_lib_dir index) in
   let s = extract_dep_raw_string mlast in
@@ -163,7 +163,7 @@ let oc_impl (mlast : string) (index : Bsb_dir_index.t) (db : Bsb_db_decode.t)
         in
         Ext_buffer.add_char buf ' ';
         output_file buf source namespace;
-        Ext_buffer.add_string buf rhs_suffix;
+        Ext_buffer.add_string buf (Ext_file_extension.to_string rhs_ext);
 
         (* #3260 cmj changes does not imply cmi change anymore *)
         oc_cmi buf namespace source );
@@ -182,13 +182,13 @@ let oc_intf mliast (index : Bsb_dir_index.t) (db : Bsb_db_decode.t)
         output_file buf
           (Ext_filename.chop_all_extensions_maybe mliast)
           namespace;
-        Ext_buffer.add_string buf Literals.suffix_cmi;
+        Ext_buffer.add_string buf (Ext_file_extension.to_string Literals.file_extension_cmi);
         Ext_buffer.add_string buf dep_lit )
   in
   Ext_option.iter namespace (fun ns ->
       Lazy.force at_most_once;
       Ext_buffer.add_string buf ns;
-      Ext_buffer.add_string buf Literals.suffix_cmi);
+      Ext_buffer.add_string buf (Ext_file_extension.to_string Literals.file_extension_cmi));
   let cur_module_name = Ext_filename.module_name mliast in
   let is_not_lib_dir = not (Bsb_dir_index.is_lib_dir index) in
   let s = extract_dep_raw_string mliast in
@@ -217,7 +217,7 @@ let emit_d compilation_kind (index : Bsb_dir_index.t)
     (namespace : string option) (mlast : string) (mliast : string) =
   let data = Bsb_db_decode.read_build_cache ~dir:Filename.current_dir_name in
   let buf = Ext_buffer.create 2048 in
-  let filename = Ext_filename.new_extension mlast Literals.suffix_d in
+  let filename = Ext_filename.new_extension mlast Literals.file_extension_d in
   let lhs_suffix, rhs_suffix =
     match compilation_kind with
     | Js -> (Literals.suffix_cmj, Literals.suffix_cmj)

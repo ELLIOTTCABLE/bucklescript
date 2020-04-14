@@ -26,6 +26,7 @@
 type link_t = LinkBytecode of string | LinkNative of string
 
 let ( // ) = Ext_path.combine
+let ( //. ) = Ext_file_extension.append_to
 
 (* The linker is called with object files (.cmo / .cmx) which will be namespaced
    and we're using those names to read-in the mlast files which are not
@@ -39,12 +40,18 @@ let module_of_filename filename =
 
 let link link_byte_or_native ~main_module ~batch_files ~includes
     ~ocaml_dependencies ~namespace ~warnings ~warn_error ~verbose ~cwd =
-  let suffix_object_files, suffix_library_files, compiler, output_file =
+  let ext_object_files, ext_library_files, compiler, output_file =
     match link_byte_or_native with
     | LinkBytecode output_file ->
-        (Literals.suffix_cmo, Literals.suffix_cma, "ocamlc", output_file)
+        ( Literals.file_extension_cmo,
+          Literals.file_extension_cma,
+          "ocamlc",
+          output_file )
     | LinkNative output_file ->
-        (Literals.suffix_cmx, Literals.suffix_cmxa, "ocamlopt", output_file)
+        ( Literals.file_extension_cmx,
+          Literals.file_extension_cmxa,
+          "ocamlopt",
+          output_file )
   in
   (* Map used to track the path to the files as the dependency_graph that we're
      going to read from the mlast file only contains module names *)
@@ -57,15 +64,15 @@ let link link_byte_or_native ~main_module ~batch_files ~includes
   let dependency_graph =
     Ext_list.fold_left batch_files Map_string.empty (fun m file ->
         let module_name = module_of_filename file in
-        let suffix =
-          if Sys.file_exists (module_name ^ Literals.suffix_mlast) then
-            Literals.suffix_mlast
-          else Literals.suffix_reast
+        let ext =
+          if Sys.file_exists (module_name //. Literals.file_extension_mlast)
+          then Literals.file_extension_mlast
+          else Literals.file_extension_reast
         in
         Map_string.add m
           (Ext_filename.module_name module_name)
           (Bsb_helper_extract.read_dependency_graph_from_mlast_file
-             (module_name ^ suffix)))
+             (module_name //. ext)))
   in
   let ocaml_dependencies =
     List.fold_left
@@ -73,13 +80,12 @@ let link link_byte_or_native ~main_module ~batch_files ~includes
         match v with
         | "threads" ->
             "-thread"
-            :: ( Bsb_global_paths.ocaml_dir // "lib" // "ocaml" // "threads"
-                 // "threads"
-               ^ suffix_library_files )
+            :: Bsb_global_paths.ocaml_dir // "lib" // "ocaml" // "threads"
+               // "threads" //. ext_library_files
             :: acc
         | v ->
-            ( (Bsb_global_paths.ocaml_dir // "lib" // "ocaml" // v)
-            ^ suffix_library_files )
+            Bsb_global_paths.ocaml_dir // "lib" // "ocaml" // v
+            //. ext_library_files
             :: acc)
       [] ocaml_dependencies
   in
@@ -104,21 +110,21 @@ let link link_byte_or_native ~main_module ~batch_files ~includes
     Queue.fold
       (fun acc v ->
         match Map_string.find_opt module_to_filepath v with
-        | Some file -> (file ^ namespace ^ suffix_object_files) :: acc
+        | Some file -> (file ^ (namespace //. ext_object_files)) :: acc
         | None -> Bsb_exception.missing_object_file v)
       [] tasks
   in
   if list_of_object_files <> [] then (
     let library_files =
       Ext_list.fold_left includes [] (fun acc dir ->
-          Ext_path.combine dir (Literals.library_file ^ suffix_library_files)
+          Ext_path.combine dir (Literals.library_file ^ ext_library_files)
           :: acc)
     in
     (* This list will be reversed so we append the otherlibs object files at the
        end, and they'll end at the beginning. *)
     let otherlibs =
       Bsb_helper_dep_graph.get_otherlibs_dependencies dependency_graph
-        suffix_library_files
+        ext_library_files
     in
     let all_object_files =
       ocaml_dependencies @ library_files
@@ -142,6 +148,7 @@ let link link_byte_or_native ~main_module ~batch_files ~includes
 
     Unix.execvp local_compiler (Array.of_list list_of_args) )
   else
-    failwith @@ "No " ^ suffix_object_files
+    failwith @@ "No "
+    ^ Ext_file_extension.to_string ext_object_files
     ^ " to link. Hint: is the main module in the entries array right?"
 #end
