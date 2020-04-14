@@ -24,15 +24,17 @@
 
 type t
 
-val default_package_specs : t
+val default_package_specs : ?deprecated_bs_suffix:bool -> unit -> t
 
-val from_json : Ext_json_types.t -> t
+val from_json : ?deprecated_bs_suffix:bool -> Ext_json_types.t -> t
 
-val get_list_of_output_js : t -> bool -> string -> string list
+val get_list_of_output_js : t -> string -> string list
 
-val package_flag_of_package_specs : t -> string -> string
+val extract_in_source_bs_suffixes : t -> string list
+
+val flags_of_package_specs : t -> string -> string
 (** Sample output:
 
-    {[ -bs-package-output commonjs:lib/js/jscomp/test ]} *)
+    {[ -bs-package-output commonjs:lib/js/jscomp/test:mjs ]} *)
 
 val list_dirs_by : t -> (string -> unit) -> unit

@@ -378,14 +378,23 @@ let suites =
         =~"ABb"
     end;
     __LOC__ >:: begin fun _ ->
-      Ext_namespace.change_ext_ns_suffix "a-b" Literals.suffix_js =~ "a.js";
-      Ext_namespace.change_ext_ns_suffix "a-" Literals.suffix_js =~ "a.js";
-      Ext_namespace.change_ext_ns_suffix "a--" Literals.suffix_js =~ "a-.js";
-      Ext_namespace.change_ext_ns_suffix "AA-b" Literals.suffix_js =~ "AA.js";
-      Ext_namespace.js_name_of_modulename "AA-b" Little_js =~ "aA.js";
-      Ext_namespace.js_name_of_modulename "AA-b" Upper_js =~ "AA.js";
-      Ext_namespace.js_name_of_modulename "AA-b" Upper_bs =~ "AA.bs.js"
-    end;
+      Ext_namespace.replace_namespace_with_extension
+        ~name:"a-b" ~ext:Literals.suffix_js =~ "a.js";
+      Ext_namespace.replace_namespace_with_extension
+        ~name:"a-" ~ext:Literals.suffix_js =~ "a.js";
+      Ext_namespace.replace_namespace_with_extension
+        ~name:"a--" ~ext:Literals.suffix_js =~ "a-.js";
+      Ext_namespace.replace_namespace_with_extension
+        ~name:"AA-b" ~ext:Literals.suffix_js =~ "AA.js";
+      Ext_namespace.replace_namespace_with_extension
+        ~name:"AA-b" ~ext:Literals.suffix_js =~ "AA.js";
+      Ext_namespace.js_filename_of_modulename
+        ~name:"AA-b" ~ext:Literals.suffix_js Lower =~ "aA.js";
+      Ext_namespace.js_filename_of_modulename
+        ~name:"AA-b" ~ext:Literals.suffix_js Upper =~ "AA.js";
+      Ext_namespace.js_filename_of_modulename
+        ~name:"AA-b" ~ext:Literals.suffix_bs_js Upper =~ "AA.bs.js";
+     end;
     __LOC__ >:: begin   fun _ ->
       let (=~) = OUnit.assert_equal ~printer:(fun x ->
           match x with

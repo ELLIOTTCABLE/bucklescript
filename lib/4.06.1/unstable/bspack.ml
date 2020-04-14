@@ -9966,7 +9966,11 @@ val suffix_rei : string
 
 val suffix_d : string
 val suffix_js : string
+val suffix_mjs : string
+val suffix_cjs : string
 val suffix_bs_js : string
+val suffix_bs_mjs : string
+val suffix_bs_cjs : string
 (* val suffix_re_js : string *)
 val suffix_gen_js : string
 val suffix_gen_tsx: string
@@ -10104,8 +10108,13 @@ let suffix_reast = ".reast"
 let suffix_reiast = ".reiast"
 let suffix_mliast_simple = ".mliast_simple"
 let suffix_d = ".d"
+
 let suffix_js = ".js"
+let suffix_mjs = ".mjs"
+let suffix_cjs = ".cjs"
 let suffix_bs_js = ".bs.js"
+let suffix_bs_mjs = ".bs.mjs"
+let suffix_bs_cjs = ".bs.cjs"
 (* let suffix_re_js = ".re.js" *)
 let suffix_gen_js = ".gen.js"
 let suffix_gen_tsx = ".gen.tsx"
@@ -11234,15 +11243,13 @@ module Js_config : sig
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. *)
 
-(* val get_packages_info : unit -> Js_packages_info.t *)
-
 val no_version_header : bool ref
 (** set/get header *)
 
 (** return [package_name] and [path] when in script mode: *)
 
-(* val get_current_package_name_and_path : Js_packages_info.module_system ->
-   Js_packages_info.info_query *)
+(* val get_current_package_name_and_path : Js_package_info.module_system ->
+   Js_package_info.info_query *)
 
 (* val set_package_name : string -> unit val get_package_name : unit -> string
    option *)
@@ -11283,7 +11290,6 @@ val syntax_only : bool ref
 val binary_ast : bool ref
 val simple_binary_ast : bool ref
 
-val bs_suffix : bool ref
 val debug : bool ref
 
 val cmi_only : bool ref
@@ -11339,8 +11345,6 @@ let get_diagnose () = !diagnose
 let set_diagnose b = diagnose := b
 
 let ( // ) = Filename.concat
-
-(* let get_packages_info () = !packages_info *)
 
 let no_builtin_ppx_ml = ref false
 let no_builtin_ppx_mli = ref false

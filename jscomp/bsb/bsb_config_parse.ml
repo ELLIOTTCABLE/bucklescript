@@ -85,13 +85,32 @@ let extract_main_entries (map : json_map) =
 #end
 
 
+let deprecated_extract_bs_suffix_exn (map : json_map) =
+  match Map_string.find_opt map Bsb_build_schemas.suffix with
+  | None -> None
+  | Some (Str { str } as config) ->
+      if str = Literals.suffix_js then Some false
+      else if str = Literals.suffix_bs_js then Some true
+      else
+        Bsb_exception.config_error config
+          "DEPRECATED: This form of 'suffix' only supports either `.js` or \
+           `.bs.js`. Use 'suffix' under 'package-specs' instead."
+  | Some config ->
+      Bsb_exception.config_error config
+        "DEPRECATED: This form of 'suffix' only supports a string"
+
+
+let package_specs_from_obj_map (map : json_map) =
+  let deprecated_bs_suffix = deprecated_extract_bs_suffix_exn map in
+  match Map_string.find_opt map Bsb_build_schemas.package_specs with
+  | Some x -> Bsb_package_specs.from_json ?deprecated_bs_suffix x
+  | None -> Bsb_package_specs.default_package_specs ?deprecated_bs_suffix ()
+
+
 let package_specs_from_bsconfig () =
   let json = Ext_json_parse.parse_json_from_file Literals.bsconfig_json in
   match json with
-  | Obj { map } -> (
-      match Map_string.find_opt map Bsb_build_schemas.package_specs with
-      | Some x -> Bsb_package_specs.from_json x
-      | None -> Bsb_package_specs.default_package_specs )
+  | Obj { map } -> package_specs_from_obj_map map
   | _ -> assert false
 
 
@@ -157,17 +176,6 @@ let check_stdlib (map : json_map) cwd (*built_in_package*) =
               package_install_path = stdlib_path // Bsb_config.lib_ocaml;
             }
       | _ -> assert false )
-
-
-let extract_bs_suffix_exn (map : json_map) =
-  match Map_string.find_opt map Bsb_build_schemas.suffix with
-  | None -> false
-  | Some (Str { str } as config) ->
-      if str = Literals.suffix_js then false
-      else if str = Literals.suffix_bs_js then true
-      else Bsb_exception.config_error config "expect .bs.js or .js string here"
-  | Some config ->
-      Bsb_exception.config_error config "expect .bs.js or .js string here"
 
 
 let extract_gentype_config (map : json_map) cwd :
@@ -375,13 +383,11 @@ let interpret_json ~toplevel_package_specs ~(per_proj_dir : string) :
       let package_name, namespace = extract_package_name_and_namespace map in
       let refmt = extract_refmt map per_proj_dir in
       let gentype_config = extract_gentype_config map per_proj_dir in
-      let bs_suffix = extract_bs_suffix_exn map in
       (* The default situation is empty *)
       let built_in_package = check_stdlib map per_proj_dir in
-      let package_specs =
-        match Map_string.find_opt map Bsb_build_schemas.package_specs with
-        | Some x -> Bsb_package_specs.from_json x
-        | None -> Bsb_package_specs.default_package_specs
+      let package_specs = package_specs_from_obj_map map in
+      let bs_suffixes =
+        Bsb_package_specs.extract_in_source_bs_suffixes package_specs
       in
       let pp_flags : string option =
         extract_string map Bsb_build_schemas.pp_flags (fun p ->
@@ -411,12 +417,11 @@ let interpret_json ~toplevel_package_specs ~(per_proj_dir : string) :
           in
           let groups, number_of_dev_groups =
             Bsb_parse_sources.scan ~ignored_dirs:(extract_ignored_dirs map)
-              ~toplevel ~root:per_proj_dir ~cut_generators ~bs_suffix ~namespace
-              sources
+              ~toplevel ~root:per_proj_dir ~cut_generators ~bs_suffixes
+              ~namespace sources
           in
           {
             gentype_config;
-            bs_suffix;
             package_name;
             namespace;
             warning = extract_warning map;

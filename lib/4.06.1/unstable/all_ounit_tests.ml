@@ -5106,7 +5106,11 @@ val suffix_rei : string
 
 val suffix_d : string
 val suffix_js : string
+val suffix_mjs : string
+val suffix_cjs : string
 val suffix_bs_js : string
+val suffix_bs_mjs : string
+val suffix_bs_cjs : string
 (* val suffix_re_js : string *)
 val suffix_gen_js : string
 val suffix_gen_tsx: string
@@ -5244,8 +5248,13 @@ let suffix_reast = ".reast"
 let suffix_reiast = ".reiast"
 let suffix_mliast_simple = ".mliast_simple"
 let suffix_d = ".d"
+
 let suffix_js = ".js"
+let suffix_mjs = ".mjs"
+let suffix_cjs = ".cjs"
 let suffix_bs_js = ".bs.js"
+let suffix_bs_mjs = ".bs.mjs"
+let suffix_bs_cjs = ".bs.cjs"
 (* let suffix_re_js = ".re.js" *)
 let suffix_gen_js = ".gen.js"
 let suffix_gen_tsx = ".gen.tsx"
@@ -7682,15 +7691,13 @@ module Js_config : sig
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. *)
 
-(* val get_packages_info : unit -> Js_packages_info.t *)
-
 val no_version_header : bool ref
 (** set/get header *)
 
 (** return [package_name] and [path] when in script mode: *)
 
-(* val get_current_package_name_and_path : Js_packages_info.module_system ->
-   Js_packages_info.info_query *)
+(* val get_current_package_name_and_path : Js_package_info.module_system ->
+   Js_package_info.info_query *)
 
 (* val set_package_name : string -> unit val get_package_name : unit -> string
    option *)
@@ -7731,7 +7738,6 @@ val syntax_only : bool ref
 val binary_ast : bool ref
 val simple_binary_ast : bool ref
 
-val bs_suffix : bool ref
 val debug : bool ref
 
 val cmi_only : bool ref
@@ -7787,8 +7793,6 @@ let get_diagnose () = !diagnose
 let set_diagnose b = diagnose := b
 
 let ( // ) = Filename.concat
-
-(* let get_packages_info () = !packages_info *)
 
 let no_builtin_ppx_ml = ref false
 let no_builtin_ppx_mli = ref false
@@ -16312,14 +16316,18 @@ val make : ?ns:string -> string -> string
 
 val try_split_module_name : string -> (string * string) option
 
-val change_ext_ns_suffix : string -> string -> string
+val replace_namespace_with_extension : name:string -> ext:string -> string
+(** [replace_namespace_with_extension ~name ~ext] removes the part of [name]
+    after [ns_sep_char], if any; and appends [ext].
+*)
 
-type file_kind = Upper_js | Upper_bs | Little_js | Little_bs
+type leading_case = Upper | Lower
 
-val js_name_of_modulename : string -> file_kind -> string
+val js_filename_of_modulename :
+  name:string -> ext:string -> leading_case -> string
 (** Predicts the JavaScript filename for a given (possibly namespaced) module-
-    name; i.e. [js_name_of_modulename "AA-Ns" Little_bs] would produce
-    ["aA.bs.js"]. *)
+    name; i.e. [js_filename_of_modulename ~name:"AA-Ns" ~ext:".js" Lower] would
+    produce ["aA.bs.js"]. *)
 
 val is_valid_npm_package_name : string -> bool
 
@@ -16382,7 +16390,7 @@ let rec rindex_rec s i =
    #1933 when removing ns suffix, don't pass the bound of basename
 
    FIXME: micro-optimizaiton *)
-let change_ext_ns_suffix name ext =
+let replace_namespace_with_extension ~name ~ext =
   let i = rindex_rec name (String.length name - 1) in
   if i < 0 then name ^ ext else String.sub name 0 i ^ ext
 
@@ -16394,18 +16402,15 @@ let try_split_module_name name =
   else Some (String.sub name (i + 1) (len - i - 1), String.sub name 0 i)
 
 
-type file_kind = Upper_js | Upper_bs | Little_js | Little_bs
+type leading_case = Upper | Lower
 
-let js_name_of_modulename s little =
-  match little with
-  | Little_js ->
-      change_ext_ns_suffix (Ext_string.uncapitalize_ascii s) Literals.suffix_js
-  | Little_bs ->
-      change_ext_ns_suffix
-        (Ext_string.uncapitalize_ascii s)
-        Literals.suffix_bs_js
-  | Upper_js -> change_ext_ns_suffix s Literals.suffix_js
-  | Upper_bs -> change_ext_ns_suffix s Literals.suffix_bs_js
+let js_filename_of_modulename ~name ~ext (leading_case : leading_case) =
+  match leading_case with
+  | Lower ->
+      replace_namespace_with_extension
+        ~name:(Ext_string.uncapitalize_ascii name)
+        ~ext
+  | Upper -> replace_namespace_with_extension ~name ~ext
 
 
 (** https://docs.npmjs.com/files/package.json
@@ -16857,14 +16862,23 @@ let suites =
         =~"ABb"
     end;
     __LOC__ >:: begin fun _ ->
-      Ext_namespace.change_ext_ns_suffix "a-b" Literals.suffix_js =~ "a.js";
-      Ext_namespace.change_ext_ns_suffix "a-" Literals.suffix_js =~ "a.js";
-      Ext_namespace.change_ext_ns_suffix "a--" Literals.suffix_js =~ "a-.js";
-      Ext_namespace.change_ext_ns_suffix "AA-b" Literals.suffix_js =~ "AA.js";
-      Ext_namespace.js_name_of_modulename "AA-b" Little_js =~ "aA.js";
-      Ext_namespace.js_name_of_modulename "AA-b" Upper_js =~ "AA.js";
-      Ext_namespace.js_name_of_modulename "AA-b" Upper_bs =~ "AA.bs.js"
-    end;
+      Ext_namespace.replace_namespace_with_extension
+        ~name:"a-b" ~ext:Literals.suffix_js =~ "a.js";
+      Ext_namespace.replace_namespace_with_extension
+        ~name:"a-" ~ext:Literals.suffix_js =~ "a.js";
+      Ext_namespace.replace_namespace_with_extension
+        ~name:"a--" ~ext:Literals.suffix_js =~ "a-.js";
+      Ext_namespace.replace_namespace_with_extension
+        ~name:"AA-b" ~ext:Literals.suffix_js =~ "AA.js";
+      Ext_namespace.replace_namespace_with_extension
+        ~name:"AA-b" ~ext:Literals.suffix_js =~ "AA.js";
+      Ext_namespace.js_filename_of_modulename
+        ~name:"AA-b" ~ext:Literals.suffix_js Lower =~ "aA.js";
+      Ext_namespace.js_filename_of_modulename
+        ~name:"AA-b" ~ext:Literals.suffix_js Upper =~ "AA.js";
+      Ext_namespace.js_filename_of_modulename
+        ~name:"AA-b" ~ext:Literals.suffix_bs_js Upper =~ "AA.bs.js";
+     end;
     __LOC__ >:: begin   fun _ ->
       let (=~) = OUnit.assert_equal ~printer:(fun x ->
           match x with

@@ -34,29 +34,27 @@ type effect = string option
 (* we don't force people to use package *)
 let single_na = Single Lam_arity.na
 
-type cmj_case = Ext_namespace.file_kind
-
 type keyed_cmj_values = (string * cmj_value) array
 
 type t = {
   values : keyed_cmj_values;
   pure : bool;
-  npm_package_path : Js_packages_info.t;
-  cmj_case : cmj_case;
+  package_info : Js_package_info.t;
+  leading_case : Ext_namespace.leading_case;
 }
 
 let empty_values = [||]
 
-let mk ~values ~effect ~npm_package_path ~cmj_case : t =
+let mk ~values ~effect ~package_info ~leading_case : t =
   {
     values = Map_string.to_sorted_array values;
     pure = effect = None;
-    npm_package_path;
-    cmj_case;
+    package_info;
+    leading_case;
   }
 
 
-let cmj_magic_number = "BUCKLE20171012"
+let cmj_magic_number = "BUCKLE20200410"
 let cmj_magic_number_length = String.length cmj_magic_number
 
 let digest_length = 16 (*16 chars *)
@@ -174,26 +172,24 @@ let query_by_name (cmj_table : t) name =
 
 let is_pure (cmj_table : t) = cmj_table.pure
 
-let get_npm_package_path (cmj_table : t) = cmj_table.npm_package_path
+let get_package_info (cmj_table : t) = cmj_table.package_info
 
-let get_cmj_case (cmj_table : t) = cmj_table.cmj_case
+let get_leading_case (cmj_table : t) = cmj_table.leading_case
 
 (* start dumping *)
 
 let f fmt = Printf.fprintf stdout fmt
 
-let pp_cmj_case (cmj_case : cmj_case) : unit =
-  match cmj_case with
-  | Little_js -> f "case : little, .js\n"
-  | Little_bs -> f "case : little, .bs.js\n"
-  | Upper_js -> f "case: upper, .js\n"
-  | Upper_bs -> f "case: upper, .bs.js\n"
+let pp_leading_case (leading_case : Ext_namespace.leading_case) : unit =
+  match leading_case with
+  | Upper -> f "case: upper\n"
+  | Lower -> f "case: lower\n"
 
 
-let pp_cmj ({ values; pure; npm_package_path; cmj_case } : t) =
+let pp_cmj ({ values; pure; package_info; leading_case } : t) =
   f "package info: %s\n"
-    (Format.asprintf "%a" Js_packages_info.dump_packages_info npm_package_path);
-  pp_cmj_case cmj_case;
+    (Format.asprintf "%a" Js_package_info.dump_package_info package_info);
+  pp_leading_case leading_case;
 
   f "effect: %s\n" (if pure then "pure" else "not pure");
   Ext_array.iter values (fun (k, { arity; persistent_closed_lambda }) ->

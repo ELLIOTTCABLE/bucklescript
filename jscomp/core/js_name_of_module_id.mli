@@ -25,7 +25,8 @@
 val string_of_module_id :
   Lam_module_ident.t ->
   output_dir:string ->
-  Js_packages_info.module_system ->
+  ext:string ->
+  Js_package_info.module_system ->
   string
 (** generate the mdoule path so that it can be spliced here:
 

@@ -150,7 +150,10 @@ let buckle_script_flags : (string * Arg.spec * string) list =
   :: ( "-bs-gentype",
        Arg.String (fun s -> Clflags.bs_gentype := Some s),
        " Pass gentype command" )
-  :: ("-bs-suffix", Arg.Set Js_config.bs_suffix, " Set suffix to .bs.js")
+  :: ( "-bs-suffix",
+       Arg.Unit Js_package_info.deprecated_set_bs_extension,
+       " (DEPRECATED) Set default suffix to .bs.js - use third compoment of \
+        -bs-package-output instead" )
   :: ( "-bs-no-implicit-include",
        Arg.Set Clflags.no_implicit_current_dir,
        " Don't include current dir implicitly" )
@@ -203,19 +206,19 @@ let buckle_script_flags : (string * Arg.spec * string) list =
        Arg.Clear Js_config.sort_imports,
        " No sort (see -bs-sort-imports)" )
   :: ( "-bs-package-name",
-       Arg.String Js_packages_state.set_package_name,
+       Arg.String Js_current_package_info.set_package_name,
        " set package name, useful when you want to produce npm packages" )
   :: ( "-bs-ns",
-       Arg.String Js_packages_state.set_package_map,
+       Arg.String Js_current_package_info.set_package_map,
        " set package map, not only set package name but also use it as a \
         namespace" )
   :: ( "-bs-no-version-header",
        Arg.Set Js_config.no_version_header,
        " Don't print version header" )
   :: ( "-bs-package-output",
-       Arg.String Js_packages_state.update_npm_package_path,
-       " set npm-output-path: [opt_module]:path, for example: 'lib/cjs', \
-        'amdjs:lib/amdjs', 'es6:lib/es6' " )
+       Arg.String Js_current_package_info.append_location_descriptor_of_string,
+       " set npm-output-path: [opt_module]:path:[ext], for example: 'lib/cjs', \
+        'amdjs:lib/amdjs', 'es6:lib/es6:mjs' " )
   :: ( "-bs-no-warn-unimplemented-external",
        Arg.Set Js_config.no_warn_unimplemented_external,
        " disable warnings on unimplmented c externals" )

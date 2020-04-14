@@ -24,10 +24,10 @@
 
 let ( // ) = Ext_path.combine
 
-(* TODO: sync up with {!Js_packages_info.module_system} *)
+(* TODO: sync up with {!Js_package_info.module_system} *)
 type format = NodeJS | Es6 | Es6_global
 
-type spec = { format : format; in_source : bool }
+type spec = { format : format; in_source : bool; suffix : string }
 
 module Spec_set = Set.Make (struct
   type t = spec
@@ -64,35 +64,117 @@ let prefix_of_format (x : format) =
   | Es6_global -> Bsb_config.lib_es6_global
 
 
-let rec from_array (arr : Ext_json_types.t array) : Spec_set.t =
-  let spec = ref Spec_set.empty in
-  let has_in_source = ref false in
+let deprecated_bs_suffix_message_warn () =
+  Bsb_log.warn
+    "@{<warning>DEPRECATED@}: @[top-level 'suffix' field is deprecated;@ \
+     please lower your extension-configuration into@ 'package-specs'.@]@."
+
+
+let bad_suffix_message_warn suffix =
+  let open Literals in
+  Bsb_log.warn
+    "@{<warning>UNSUPPORTED@}: @[package-specs: extension `%s` is \
+     unsupported;@ consider one of: %s, %s, %s; %s, %s,@ or %s.@]@."
+    suffix suffix_js suffix_mjs suffix_cjs suffix_bs_js suffix_bs_mjs
+    suffix_bs_cjs
+
+
+let supported_suffix (x : string) =
+  if
+    not
+      (List.mem x
+         Literals.
+           [
+             suffix_js;
+             suffix_mjs;
+             suffix_cjs;
+             suffix_bs_js;
+             suffix_bs_mjs;
+             suffix_bs_cjs;
+           ])
+  then bad_suffix_message_warn x;
+  x
+
+
+let default_suffix ~deprecated_bs_suffix _format _in_source =
+  (* match (format, in_source) with *)
+  (* | NodeJS, false -> Literals.suffix_js *)
+  (* | NodeJS, true -> Literals.suffix_bs_js *)
+  (* | _, false -> Literals.suffix_mjs *)
+  (* | _, true -> Literals.suffix_bs_mjs *)
+
+  (* TODO: In the absence of direction to the contrary, the suffix should
+     eventually depend on [format] and [in_source]. For now, for
+     backwards-compatibility, I'm hardcoding. *)
+  if deprecated_bs_suffix then Literals.suffix_bs_js else Literals.suffix_js
+
+
+module SS = Set.Make (String)
+
+let supported_bs_suffixes =
+  Literals.[ suffix_bs_js; suffix_bs_mjs; suffix_bs_cjs ]
+
+
+(** Produces a [list] of supported, bs-prefixed file-suffixes used in
+    [in-source] package-specs. *)
+let extract_in_source_bs_suffixes (package_specs : Spec_set.t) =
+  let f spec suffixes =
+    if spec.in_source && List.mem spec.suffix supported_bs_suffixes then
+      SS.add spec.suffix suffixes
+    else suffixes
+  in
+  let suffixes = Spec_set.fold f package_specs SS.empty in
+  SS.elements suffixes
+
+
+let rec from_array ~deprecated_bs_suffix (arr : Ext_json_types.t array) :
+    Spec_set.t =
+  let specs = ref Spec_set.empty in
   Ext_array.iter arr (fun x ->
-      let result = from_json_single x in
-      if result.in_source then
-        if not !has_in_source then has_in_source := true
-        else
-          Bsb_exception.errorf ~loc:(Ext_json.loc_of x)
-            "package-specs: we've detected two module formats that are both \
-             configured to be in-source.";
-      spec := Spec_set.add result !spec);
-  !spec
+      let spec = from_json_single ~deprecated_bs_suffix x in
+      if
+        Spec_set.exists
+          (fun o ->
+            spec.in_source == o.in_source && String.equal spec.suffix o.suffix)
+          !specs
+      then
+        Bsb_exception.errorf ~loc:(Ext_json.loc_of x)
+          "package-specs: two conflicting module formats with the extension \
+           `%s` are both configured to be in-source."
+          spec.suffix
+      else specs := Spec_set.add spec !specs);
+  !specs
 
 
-(* TODO: FIXME: better API without mutating *)
-and from_json_single (x : Ext_json_types.t) : spec =
+(* FIXME: better API without mutating *)
+and from_json_single ~deprecated_bs_suffix (x : Ext_json_types.t) : spec =
   match x with
   | Str { str = format; loc } ->
-      { format = supported_format format loc; in_source = false }
+      let format = supported_format format loc in
+      {
+        format;
+        in_source = false;
+        suffix = default_suffix ~deprecated_bs_suffix format false;
+      }
   | Obj { map; loc } -> (
-      match Map_string.find_exn map "module" with
+      match Map_string.find_exn map Bsb_build_schemas._module with
       | Str { str = format } ->
+          let format = supported_format format loc in
           let in_source =
             match Map_string.find_opt map Bsb_build_schemas.in_source with
             | Some (True _) -> true
             | Some _ | None -> false
           in
-          { format = supported_format format loc; in_source }
+          let suffix =
+            match Map_string.find_opt map Bsb_build_schemas.suffix with
+            | Some (Str { str = suffix; loc }) -> supported_suffix suffix
+            | Some _ ->
+                Bsb_exception.errorf ~loc
+                  "package-specs: the `suffix` field of the configuration \
+                   object must be absent, or a string."
+            | None -> default_suffix ~deprecated_bs_suffix format in_source
+          in
+          { format; in_source; suffix }
       | Arr _ ->
           Bsb_exception.errorf ~loc
             "package-specs: when the configuration is an object, `module` \
@@ -112,42 +194,53 @@ and from_json_single (x : Ext_json_types.t) : spec =
         "package-specs: we expect either a string or an object."
 
 
-let from_json (x : Ext_json_types.t) : Spec_set.t =
+let from_json ?(deprecated_bs_suffix = false) (x : Ext_json_types.t) :
+    Spec_set.t =
+  if deprecated_bs_suffix then deprecated_bs_suffix_message_warn ();
   match x with
-  | Arr { content; _ } -> from_array content
-  | _ -> Spec_set.singleton (from_json_single x)
+  | Arr { content; _ } -> from_array ~deprecated_bs_suffix content
+  | _ -> Spec_set.singleton (from_json_single ~deprecated_bs_suffix x)
 
 
 let bs_package_output = "-bs-package-output"
 
 (** Assume input is valid
 
-    {[ -bs-package-output commonjs:lib/js/jscomp/test ]} *)
-let package_flag ({ format; in_source } : spec) dir =
+    {[ -bs-package-output commonjs:lib/js/jscomp/test:mjs ]} *)
+let package_flag ({ format; in_source; suffix } : spec) dir =
   Ext_string.inter2 bs_package_output
-    (Ext_string.concat3 (string_of_format format) Ext_string.single_colon
-       (if in_source then dir else prefix_of_format format // dir))
+    (Ext_string.concat5 (string_of_format format) Ext_string.single_colon
+       (if in_source then dir else prefix_of_format format // dir)
+       Ext_string.single_colon suffix)
 
 
-let package_flag_of_package_specs (package_specs : t) (dirname : string) :
-    string =
+let flags_of_package_specs (package_specs : t) (dirname : string) : string =
   Spec_set.fold
     (fun format acc -> Ext_string.inter2 acc (package_flag format dirname))
     package_specs Ext_string.empty
 
 
-let default_package_specs =
-  Spec_set.singleton { format = NodeJS; in_source = false }
+let default_package_specs ?deprecated_bs_suffix () =
+  let deprecated_bs_suffix = match deprecated_bs_suffix with
+  | Some x -> deprecated_bs_suffix_message_warn (); x
+  | None -> false
+  in
+  Spec_set.singleton
+    {
+      format = NodeJS;
+      in_source = false;
+      suffix = default_suffix ~deprecated_bs_suffix NodeJS false;
+    }
 
 
 (** [get_list_of_output_js specs true "src/hi/hello"] *)
-let get_list_of_output_js (package_specs : Spec_set.t) (bs_suffix : bool)
+let get_list_of_output_js (package_specs : Spec_set.t)
     (output_file_sans_extension : string) =
   Spec_set.fold
-    (fun (spec : spec) acc ->
+    (fun spec acc ->
       let basename =
-        Ext_namespace.change_ext_ns_suffix output_file_sans_extension
-          (if bs_suffix then Literals.suffix_bs_js else Literals.suffix_js)
+        Ext_namespace.replace_namespace_with_extension
+          ~name:output_file_sans_extension ~ext:spec.suffix
       in
       ( Bsb_config.proj_rel
       @@

@@ -53,7 +53,7 @@ let rec rindex_rec s i =
    #1933 when removing ns suffix, don't pass the bound of basename
 
    FIXME: micro-optimizaiton *)
-let change_ext_ns_suffix name ext =
+let replace_namespace_with_extension ~name ~ext =
   let i = rindex_rec name (String.length name - 1) in
   if i < 0 then name ^ ext else String.sub name 0 i ^ ext
 
@@ -65,18 +65,15 @@ let try_split_module_name name =
   else Some (String.sub name (i + 1) (len - i - 1), String.sub name 0 i)
 
 
-type file_kind = Upper_js | Upper_bs | Little_js | Little_bs
+type leading_case = Upper | Lower
 
-let js_name_of_modulename s little =
-  match little with
-  | Little_js ->
-      change_ext_ns_suffix (Ext_string.uncapitalize_ascii s) Literals.suffix_js
-  | Little_bs ->
-      change_ext_ns_suffix
-        (Ext_string.uncapitalize_ascii s)
-        Literals.suffix_bs_js
-  | Upper_js -> change_ext_ns_suffix s Literals.suffix_js
-  | Upper_bs -> change_ext_ns_suffix s Literals.suffix_bs_js
+let js_filename_of_modulename ~name ~ext (leading_case : leading_case) =
+  match leading_case with
+  | Lower ->
+      replace_namespace_with_extension
+        ~name:(Ext_string.uncapitalize_ascii name)
+        ~ext
+  | Upper -> replace_namespace_with_extension ~name ~ext
 
 
 (** https://docs.npmjs.com/files/package.json
